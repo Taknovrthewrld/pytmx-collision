@@ -1,0 +1,172 @@
+##import pygame libraries
+import pygame, time, random, math, pytmx, sys
+from pygame.locals import *
+from pytmx import load_pygame
+
+##initiate pygame and the clock variable
+pygame.init()
+mainClock = pygame.time.Clock()
+
+##set window coords
+winwidth, winheight = 512, 480
+##creates window and assigns it to a variable
+screen = pygame.display.set_mode((winwidth, winheight))
+##set window caption
+pygame.display.set_caption('Window Caption')
+
+##import images
+player_img_front = pygame.image.load("player_sprites/player.png")
+player_img_back = pygame.image.load("player_sprites/player_back.png")
+player_img_right = pygame.image.load("player_sprites/player_right.png")
+player_img_left = pygame.image.load("player_sprites/player_left.png")
+
+##LOAD TMX MAP
+level_one = load_pygame("maps/room1.tmx")
+
+##name some lists and groups
+player_list = pygame.sprite.GroupSingle()
+layer1_tiles = pygame.sprite.Group()
+layer2_tiles = pygame.sprite.Group()
+
+class Tile(pygame.sprite.Sprite):
+
+    def __init__(self, x, y, tile):
+        pygame.sprite.Sprite.__init__(self)
+
+        self.image = tile
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        
+
+class Player(pygame.sprite.Sprite):
+    moveSpeed = 3
+    change_in_x = 0
+    change_in_y = 0
+    direction = "None"
+
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+
+        self.image = player_img_front
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+##create an instance of the Player class
+##then adds it to the sprites list
+player = Player(150, 130)
+player.add(player_list)
+
+##get tiles from TMX MAP as pygame.Surface
+##use each tile to create an instance of Tile() sprite
+##add each Tile() sprite instance to pygame.sprite.Group
+for y in range(15):
+    for x in range(16):
+        ##first layer 1
+        tile = level_one.get_tile_image(x, y, 0)
+        tile_sprite = Tile(x*32, y*32, tile)
+        layer1_tiles.add(tile_sprite)
+
+        ##then layer 2, setting colorkey to 0
+        ##so white is transparent in these tiles
+        ##also using GID (grid identification number)
+        ##to pass over any blank tiles (gid=0 or 15)
+        gid = level_one.get_tile_gid(x, y, 1)
+        if gid == 0 or gid == 15:
+            pass
+        else:
+            tile = level_one.get_tile_image(x, y, 1)
+            tile_sprite = Tile(x*32, y*32, tile)
+            tile.set_colorkey(0)
+            layer2_tiles.add(tile_sprite)
+
+##quick one-liner so key events repeat when held down
+pygame.key.set_repeat(10,10)
+
+##MAIN LOOP
+while 1:
+
+    mainClock.tick(60)
+
+    for event in pygame.event.get():
+
+        ##event handling for window X clicked
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+
+        ##KEY UP and KEY DOWN event handling
+        ##all this does is update player object's value for direction
+        if event.type == KEYDOWN:
+            if event.key == K_ESCAPE:
+                pygame.quit()
+                sys.exit()
+            if event.key == K_LEFT:
+                player.direction = "Left"
+            if event.key == K_RIGHT:
+                player.direction = "Right"
+            if event.key == K_UP:
+                player.direction = "Up"
+            if event.key == K_DOWN:
+                player.direction = "Down"
+            if event.key == K_LSHIFT:   ##left shift key to increase moveSpeed (dash button)
+                player.moveSpeed = 6
+        if event.type == KEYUP:
+            if event.key == K_LEFT:
+                player.direction = "None"
+            if event.key == K_RIGHT:
+                player.direction = "None"
+            if event.key == K_UP:
+                player.direction = "None"
+            if event.key == K_DOWN:
+                player.direction = "None"
+            if event.key == K_LSHIFT:  ##reset moveSpeed after dash ends
+                player.moveSpeed = 3
+
+        ##PLAYER MOVEMENT
+        ##change_in_x and change_in_y is set equal to moveSpeed
+        ##player is moved by incrementing x, y by the values of change
+        ##also swap player image so facing correct way
+        if player.direction == "Right":
+            player.change_in_x = player.moveSpeed
+            player.rect.x += player.change_in_x
+            player.image = player_img_right
+        if player.direction == "Left":
+            player.change_in_x = player.moveSpeed
+            player.rect.x += -player.change_in_x
+            player.image = player_img_left
+        if player.direction == "Up":
+            player.change_in_y = -player.moveSpeed
+            player.rect.y += player.change_in_y
+            player.image = player_img_back
+        if player.direction == "Down":
+            player.change_in_y = player.moveSpeed
+            player.rect.y += player.change_in_y
+            player.image = player_img_front
+
+        ##COLLISION DETECTION
+        ##uses direction to decide how to handle collision
+        ##so for each tile in layer2 if there is a collision
+        ##check the player's direction and decrement the player's position accordingly
+        for tile in layer2_tiles:
+            if player.rect.colliderect(tile.rect):
+                if player.direction == "Right":
+                    player.rect.x -= player.change_in_x
+                if player.direction == "Left":
+                    player.rect.x -= -player.change_in_x
+                if player.direction == "Up":
+                    player.rect.y -= player.change_in_y
+                if player.direction == "Down":
+                    player.rect.y -= player.change_in_y
+
+        ##use the sprite groups draw function
+        ##to blit both layers to the screen
+        layer1_tiles.draw(screen)
+        layer2_tiles.draw(screen)
+
+        ##same method to blit player to the screen
+        player_list.draw(screen)
+
+        pygame.display.update()
+        mainClock.tick(60)
